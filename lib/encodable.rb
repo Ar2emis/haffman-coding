@@ -1,20 +1,33 @@
 module Encodable
+  INPUT_FILE = 'input.yml'.freeze
+  ENCODED_SUFFIX = '_encoded'.freeze
   ZERO = '0'.freeze
   ONE = '1'.freeze
+  BITS = 8
+
+  def encode_file(file_name)
+    encoded = encode(File.open(file_name).read)
+    File.open(INPUT_FILE, 'w') { |input_file| input_file.write(encoded.transform_keys(&:to_s).to_yaml) }
+    File.open(file_name + ENCODED_SUFFIX, 'w') { |output_file| output_file.write(encoded[:output]) }
+    encoded
+  end
 
   def encode(row)
     chars_counts = row.chars.group_by(&:itself).transform_values(&:count).map do |char, count|
       { char: char, count: count }
     end
     tree = build_tree(chars_counts)
-    { tree: tree, input: row, output: encoded_string(row, tree) }
+    { tree: tree, input: row }.merge(encoded_string(row, tree))
   end
 
   private
 
   def encoded_string(row, tree)
     char_bits = char_bits(tree)
-    row.chars.map { |char| char_bits[char] }.join
+    binary = row.chars.map { |char| char_bits[char] }.join
+    trash_count = BITS - binary.length % BITS
+    encoded = (binary + ZERO * trash_count).scan(/.{#{BITS}}/).map { |binary_char| binary_char.to_i(2).chr }.join
+    { output: encoded, binary_output: binary, trash_count: trash_count }
   end
 
   def build_tree(chars_counts)
