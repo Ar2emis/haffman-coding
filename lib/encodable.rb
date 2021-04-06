@@ -7,8 +7,11 @@ module Encodable
 
   def encode_file(file_name)
     encoded = encode(File.open(file_name).read)
-    File.open(INPUT_FILE, 'w') { |input_file| input_file.write(encoded.transform_keys(&:to_s).to_yaml) }
-    File.open(file_name + ENCODED_SUFFIX, 'w') { |output_file| output_file.write(encoded[:output]) }
+    # File.open(INPUT_FILE, 'w') { |input_file| input_file.write(encoded.transform_keys(&:to_s).to_yaml) }
+    File.open(file_name + ENCODED_SUFFIX, 'w') do |f|
+      f.write(encoded.slice(:tree, :trash_count).to_s + "\n")
+      f.write(encoded[:output])
+    end
     encoded
   end
 
