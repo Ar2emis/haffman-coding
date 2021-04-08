@@ -1,28 +1,29 @@
+# frozen_string_literal: true
+
 module Decodable
-  DECODED_SUFFIX = '_decoded'.freeze
+  DECODED_SUFFIX = '.decoded'
 
   def decode_file(file_name)
-    file = File.open(file_name)
-    encoded = eval(file.readline)
-    row = file.read
-    file.close
-
-    binding.pry
-
-
-    decoded_row = decode(row, encoded[:tree], encoded[:trash_count])
+    decoded_row = decode(File.open(file_name).read)
     File.open(file_name + DECODED_SUFFIX, 'w') { |file| file.write(decoded_row) }
-    decoded_row
   end
 
-  def decode(row, tree, trash_count)
+  def decode(row)
+    stream = StringIO.new(row)
+    info = eval(stream.readline)
     decoded_row = ''
-    row.unpack('B*').first[0..-trash_count].chars.inject(tree) do |node, char|
+    prepared_row(stream.read, info).chars.inject(info[:tree]) do |node, char|
       next node[char] if node.is_a?(Hash)
 
       decoded_row += node
-      tree[char]
+      info[:tree][char]
     end
     decoded_row
+  end
+
+  private
+
+  def prepared_row(row, info)
+    row.unpack1('B*')[0..-info[:trash_count]]
   end
 end

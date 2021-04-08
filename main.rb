@@ -1,9 +1,7 @@
-require 'yaml'
-require 'json'
-require_relative 'lib/haffman'
+# frozen_string_literal: true
 
-haffman = Haffman.encode_file('input')
-# File.open(INPUT_FILE, 'w') { |file| file.write(haffman.transform_keys(&:to_s).to_yaml) }
+require_relative 'lib/huffman'
 
-Haffman.decode_file('input_encoded')
-# File.open(OUTPUT_FILE, 'w') { |file| file.write({ 'output' => decoded_row }.to_yaml) }
+file_name = ARGV[0]
+Huffman.encode_file(file_name)
+Huffman.decode_file(file_name + Encodable::ENCODED_SUFFIX)

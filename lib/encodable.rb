@@ -1,62 +1,60 @@
+# frozen_string_literal: true
+
 module Encodable
-  INPUT_FILE = 'input.yml'.freeze
-  ENCODED_SUFFIX = '_encoded'.freeze
-  ZERO = '0'.freeze
-  ONE = '1'.freeze
+  ENCODED_SUFFIX = '.encoded'
+  ZERO = '0'
+  ONE = '1'
   BITS = 8
 
   def encode_file(file_name)
     encoded = encode(File.open(file_name).read)
-    # File.open(INPUT_FILE, 'w') { |input_file| input_file.write(encoded.transform_keys(&:to_s).to_yaml) }
-    File.open(file_name + ENCODED_SUFFIX, 'w') do |f|
-      f.write(encoded.slice(:tree, :trash_count).to_s + "\n")
-      f.write(encoded[:output])
-    end
-    encoded
+    File.open(file_name + ENCODED_SUFFIX, 'w') { |f| f.write(encoded) }
   end
 
   def encode(row)
-    chars_counts = row.chars.group_by(&:itself).transform_values(&:count).map do |char, count|
-      { char: char, count: count }
-    end
-    tree = build_tree(chars_counts)
-    { tree: tree, input: row }.merge(encoded_string(row, tree))
+    prepared_row = row.unpack1('A*')
+    tree = tree(prepared_row)
+    char_bits = char_bits(tree)
+    binary = prepared_row.chars.map { |char| char_bits[char] }.join
+    trash_count = BITS - binary.length % BITS
+    build_row(transform_to_chars(binary + ZERO * trash_count), tree: tree, trash_count: trash_count)
   end
 
   private
 
-  def encoded_string(row, tree)
-    char_bits = char_bits(tree)
-    binary = row.chars.map { |char| char_bits[char] }.join
-    trash_count = BITS - binary.length % BITS
-    encoded = (binary + ZERO * trash_count).scan(/.{#{BITS}}/).map { |binary_char| binary_char.to_i(2).chr }.join
-    { output: encoded, binary_output: binary, trash_count: trash_count }
+  def transform_to_chars(binary)
+    binary.scan(/.{#{BITS}}/).map { |binary_char| binary_char.to_i(2).chr }.join
   end
 
-  def build_tree(chars_counts)
-    return formatted_node(chars_counts.first) if chars_counts.count == 1
-
-    chars_min_counts = chars_counts.min_by(2) { |char_count| char_count[:count] }
-    chars_min_counts.each { |char_min_count| chars_counts.delete(char_min_count) }
-    chars_counts.append(node(chars_min_counts))
-    build_tree(chars_counts)
+  def build_row(encoded, **kwargs)
+    "#{kwargs}\n#{encoded}"
   end
 
-  def node(chars_min_counts)
-    {
-      ZERO => formatted_node(chars_min_counts[0]),
-      ONE => formatted_node(chars_min_counts[1]),
-      count: chars_min_counts.sum { |char_min_count| char_min_count[:count] }
-    }
+  def weights_matrix(row)
+    row.chars.uniq.map { |char| [char, row.count(char)] }
   end
 
-  def formatted_node(node)
-    node.fetch(:char, node.slice(ONE, ZERO))
+  def build_tree(matrix)
+    return matrix.dig(0, 0) if matrix.count == 1
+
+    lightest_rows = matrix.min_by(2, &:last)
+    build_tree((matrix - lightest_rows) << row(lightest_rows))
+  end
+
+  def row(lightest_rows)
+    [node(*lightest_rows.map(&:first)), lightest_rows.sum(&:last)]
+  end
+
+  def node(left_node, right_node = nil)
+    { ZERO => left_node, ONE => right_node }
+  end
+
+  def tree(row)
+    matrix = weights_matrix(row)
+    matrix.count == 1 ? node(matrix.dig(0, 0)).compact : build_tree(matrix)
   end
 
   def char_bits(node, bits = '')
-    return {}.merge(char_bits(node[ZERO], bits + ZERO)).merge(char_bits(node[ONE], bits + ONE)) if node.is_a?(Hash)
-
-    node.is_a?(String) ? { node => bits } : {}
+    node.is_a?(String) ? { node => bits } : char_bits(node[ZERO], bits + ZERO).merge(char_bits(node[ONE], bits + ONE))
   end
 end
